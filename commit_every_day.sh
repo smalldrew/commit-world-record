@@ -13,11 +13,32 @@
 #
 # The commit date for each commit is set to "YYYY-MM-DD 12:00:00"
 # for consistency.
+#
+# Note: This script auto-detects if you are using GNU date (Linux) or BSD date (macOS).
 
 # Check if we're in a Git repository.
 if [ ! -d ".git" ]; then
   echo "Error: This script must be run from within a Git repository."
   exit 1
+fi
+
+# Define helper functions for date arithmetic depending on the date version.
+if date --version >/dev/null 2>&1; then
+    # GNU date
+    get_seconds() {
+        date -d "$1" +%s
+    }
+    next_day() {
+        date -I -d "$1 + 1 day"
+    }
+else
+    # BSD date (e.g., macOS)
+    get_seconds() {
+        date -j -f "%Y-%m-%d" "$1" +%s
+    }
+    next_day() {
+        date -j -v+1d -f "%Y-%m-%d" "$1" +"%Y-%m-%d"
+    }
 fi
 
 # Set the start date and end date (today) in ISO format.
@@ -27,7 +48,7 @@ end_date=$(date +%Y-%m-%d)
 current_date="$start_date"
 
 # Loop through every day until (and including) the end_date.
-while [ "$(date -d "$current_date" +%s)" -le "$(date -d "$end_date" +%s)" ]; do
+while [ "$(get_seconds "$current_date")" -le "$(get_seconds "$end_date")" ]; do
     # Set the commit time (using noon to avoid any potential timezone issues)
     commit_time="$current_date 12:00:00"
 
@@ -38,8 +59,7 @@ while [ "$(date -d "$current_date" +%s)" -le "$(date -d "$end_date" +%s)" ]; do
     git commit --allow-empty -m "Commit for $current_date"
 
     # Increment the date by one day.
-    current_date=$(date -I -d "$current_date + 1 day")
+    current_date=$(next_day "$current_date")
 done
 
 echo "Done creating commits from $start_date to $end_date."
-
